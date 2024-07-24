@@ -1,0 +1,74 @@
+import { Button, ComboBox, HorizontalBox, VerticalBox, GridBox } from "std-widgets.slint";
+import { MonitorSelector, MonitorData } from "monitor_selector.slint";
+
+
+export component MainWindow inherits Window {
+    callback toggle_capturing();
+    callback capture_target_selected();
+    callback update_monitor_preview <=> monitor-selector.update_monitor_preview;
+
+    in-out property <string> selected_com_port <=> com_port_selector.current-value;
+    in-out property <[string]> available_com_ports <=> com_port_selector.model;
+    
+    in-out property <int> selected_monitor <=> monitor-selector.selected_monitor;
+    in property <[MonitorData]> monitors_data <=> monitor_selector.monitors_data;
+
+    in-out property <bool> is_capture_running: false;
+
+    title: "Alive Backlight";
+
+    VerticalBox {
+
+        HorizontalBox {
+            alignment: LayoutAlignment.space-between;
+            max-height: 70px;
+    
+            VerticalBox {
+                padding: 0;
+                alignment: LayoutAlignment.end;
+                
+                Text { text: "COM PORT"; }
+    
+                com_port_selector := ComboBox {
+                    enabled: self.model.length > 0 ? true : false;
+                }
+            }
+            
+            VerticalBox {
+                padding: 0;
+                alignment: LayoutAlignment.end;
+
+                Button {
+                    text: !root.is_capture_running ? "Start capturing" : "Stop capturing";
+                    enabled: root.selected_com_port != "" && monitor_selector.selected_monitor > 0 ? true : false;
+
+                    clicked => {
+                        root.toggle_capturing();
+                    }
+                }
+            }
+        }
+
+        HorizontalBox {
+            padding-top: 0;
+
+            Rectangle {
+                height: 2px;
+                background: #cccccc;
+                border-radius: 1px;
+            }
+        }
+        
+        VerticalBox {
+            alignment: LayoutAlignment.start;
+
+            Text { text: "Monitors"; font-size: 18px; font-weight: 600; }
+
+            monitor_selector := MonitorSelector {
+                alignment: LayoutAlignment.start;
+            }
+        }
+        
+    }
+    
+}

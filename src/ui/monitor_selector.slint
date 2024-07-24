@@ -1,0 +1,79 @@
+import { Button, ComboBox, HorizontalBox, VerticalBox, GridBox } from "std-widgets.slint";
+
+export struct MonitorData {
+    title: string,
+    image: image
+}
+
+component MonitorItem inherits Rectangle {
+    callback clicked <=> touch.clicked;
+
+    in property <image> image;
+    in-out property <string> title;
+    in property <bool> selected;
+
+    width: 400px;
+    height: 280px;
+    border-width: selected ? 4px : 2px;
+    border-color: selected ? #f1d69b : gray;
+    border-radius: 5px;
+
+    animate border-width {
+        duration: 200ms;
+        easing: ease-in-out;
+    }
+
+    animate border-color {
+        duration: 200ms;
+        easing: ease-in-out;
+    }
+
+    Text {
+        x: (parent.width / 2) - (self.width / 2);
+        y: 8px;
+        text: parent.title;
+        max-width: 15px;
+        font-size: 14px;
+        font-weight: parent.selected ? 600 : 400;
+
+        animate font-weight {
+            duration: 200ms;
+            easing: ease-in-out;
+        }
+    }
+
+    Image {
+        y: 28px;
+        source: root.image;
+        width: 360px;
+        height: 240px;
+    }
+
+    touch := TouchArea {}
+}
+
+export component MonitorSelector inherits HorizontalBox {
+    in-out property <int> selected_monitor;
+    in-out property <[MonitorData]> monitors_data;
+
+    callback update_monitor_preview(int, string, image);
+
+    update_monitor_preview(index, title, image_data) => {
+        self.monitors_data[index].title = title;
+        self.monitors_data[index].image = image_data;
+    }
+
+    for monitor[i] in monitors_data: MonitorItem {
+        title: monitor.title;
+        image: monitor.image;
+        selected: root.selected_monitor == i+1;
+        
+        clicked => {
+            if selected_monitor == i+1 {
+                selected_monitor = 0;
+            } else {
+                selected_monitor = i+1;
+            }
+        }
+    }
+}

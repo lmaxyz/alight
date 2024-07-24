@@ -1,0 +1,16 @@
+[package]
+name = "alight"
+version = "0.1.0"
+edition = "2021"
+build = "src/build.rs"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+windows-capture = "1.2"
+serialport = "4.4"
+slint = "1.7.0"
+image = "0.25"
+
+[build-dependencies]
+slint-build = "1.7.0"

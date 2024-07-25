@@ -83,7 +83,12 @@ fn start_monitors_observer(main_window_weak: Weak<MainWindow>) {
                 continue;
             }
 
-            handlers.clear();
+            for handler in handlers.into_iter() {
+                handler.stop().unwrap();
+            }
+            
+            handlers = Vec::new();
+            
             let monitors_copy = monitors.clone();
             let img = ImageReader::new(Cursor::new(image_bytes)).with_guessed_format().unwrap().decode().unwrap();
             let _ = main_window_weak.upgrade_in_event_loop(move |w| {

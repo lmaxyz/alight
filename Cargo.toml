@@ -11,6 +11,7 @@ windows-capture = "1.2"
 serialport = "4.4"
 slint = "1.7.0"
 image = "0.25"
+rayon = "1.10"
 
 [build-dependencies]
 slint-build = "1.7.0"

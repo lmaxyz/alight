@@ -13,7 +13,7 @@ component MonitorItem inherits Rectangle {
     in property <bool> selected;
 
     width: 400px;
-    height: 280px;
+    height: 260px;
     border-width: selected ? 4px : 2px;
     border-color: selected ? #f1d69b : gray;
     border-radius: 5px;
@@ -34,25 +34,21 @@ component MonitorItem inherits Rectangle {
         text: parent.title;
         max-width: 15px;
         font-size: 14px;
-        font-weight: parent.selected ? 600 : 400;
-
-        animate font-weight {
-            duration: 200ms;
-            easing: ease-in-out;
-        }
+        font-weight: 600;
     }
 
     Image {
         y: 28px;
         source: root.image;
         width: 360px;
-        height: 240px;
+        height: 220px;
     }
 
     touch := TouchArea {}
 }
 
 export component MonitorSelector inherits HorizontalBox {
+    in-out property <bool> enabled;
     in-out property <int> selected_monitor;
     in-out property <[MonitorData]> monitors_data;
 
@@ -69,10 +65,12 @@ export component MonitorSelector inherits HorizontalBox {
         selected: root.selected_monitor == i+1;
         
         clicked => {
-            if selected_monitor == i+1 {
-                selected_monitor = 0;
-            } else {
-                selected_monitor = i+1;
+            if enabled {
+                if selected_monitor == i+1 {
+                    selected_monitor = 0;
+                } else {
+                    selected_monitor = i+1;
+                }
             }
         }
     }

@@ -1,9 +1,12 @@
+// use std::time::SystemTime;
+
 use serialport::SerialPort;
 use windows_capture::{
     capture::GraphicsCaptureApiHandler,
     frame::Frame,
     graphics_capture_api::InternalCaptureControl
 };
+use rayon::prelude::*;
 
 
 const LEDS_WIDTH: u32 = 28;
@@ -19,7 +22,8 @@ pub struct Capture {
     top: Vec<u8>,
     bottom: Vec<u8>,
 
-    // frames_counter: u8
+    // frames_counter: u8,
+    // total_time_elapsed: f32
 }
 
 impl Capture {
@@ -29,6 +33,7 @@ impl Capture {
         self.top.clear();
         self.bottom.clear();
     }
+
     fn calc_target_pixel(source_index: u32, subrow_len: u32, subcol_len: u32, row_pitch: u32, target_col_index: u32, raw_buffer: &[u8]) -> [u8; 3] {
         let mut target_pixel_sum = (0,0,0,0);
         let target_col_index_offset = target_col_index * 4;
@@ -57,6 +62,7 @@ impl Capture {
 impl GraphicsCaptureApiHandler for Capture {
     // To Get The Message From The Settings
     type Flags = Box<dyn SerialPort>;
+    // type Flags = String;
 
     // To Redirect To CaptureControl Or Start Method
     type Error = Box<dyn std::error::Error + Send + Sync>;
@@ -75,7 +81,8 @@ impl GraphicsCaptureApiHandler for Capture {
             right,
             top, 
             bottom,
-            // frames_counter:0
+            // frames_counter:0,
+            // total_time_elapsed: 0.0
         })
     }
 
@@ -94,34 +101,38 @@ impl GraphicsCaptureApiHandler for Capture {
         let subrow_len = frame_buffer.height() / LEDS_HEIGHT;
 
         let raw_buffer = frame_buffer.as_raw_buffer();
-        
-        // calc all together
-        for target_row_index in 0..LEDS_HEIGHT {
+
+        let source_top_index = 0 * subrow_len * row_pitch;
+        let source_bottom_index = (LEDS_HEIGHT-1) * subrow_len * row_pitch;
+
+        let width_results: Vec<([u8; 3], [u8; 3])> = (0..LEDS_WIDTH).into_par_iter().map(|target_col_index| {
+            // calc top
+            let top_pixel = Capture::calc_target_pixel(source_top_index, subrow_len, subcol_len, row_pitch, target_col_index, &raw_buffer);
+            // calc bottom
+            let bottom_pixel = Capture::calc_target_pixel(source_bottom_index, subrow_len, subcol_len, row_pitch, target_col_index, &raw_buffer);
+
+            (top_pixel, bottom_pixel)
+        }).collect();
+
+        for (top_pixel, bottom_pixel) in width_results.into_iter() {
+            self.top.extend_from_slice(&top_pixel);
+            self.bottom.extend_from_slice(&bottom_pixel);
+        }
+
+        let height_results: Vec<([u8; 3], [u8; 3])> = (1..LEDS_HEIGHT).into_par_iter().map(|target_row_index| {
             let source_index = target_row_index * subrow_len * row_pitch;
-            for target_col_index in 0..LEDS_WIDTH {
-                if target_row_index > 0 && target_row_index < LEDS_HEIGHT-1 && target_col_index > 0 && target_col_index < LEDS_WIDTH-1 {
-                    continue;
-                }
 
-                let target_side: &mut Vec<u8>;
+            // calc right
+            let right_pixel = Capture::calc_target_pixel(source_index, subrow_len, subcol_len, row_pitch, LEDS_WIDTH-1, &raw_buffer);
+            // calc left
+            let left_pixel = Capture::calc_target_pixel(source_index, subrow_len, subcol_len, row_pitch, 0, &raw_buffer);
 
-                if target_row_index == 0 {
-                    target_side = &mut self.top;
-                } else if target_row_index == (LEDS_HEIGHT-1) {
-                    target_side = &mut self.bottom;
-                } else if target_col_index == 0 {
-                    target_side = &mut self.left;
-                } else if target_col_index == (LEDS_WIDTH-1) {
-                    target_side = &mut self.right;
-                } else {
-                    continue;
-                }
+            (left_pixel, right_pixel)
+        }).collect();
 
-                let target_pixel: [u8; 3] = Capture::calc_target_pixel(source_index, subrow_len, subcol_len, row_pitch, target_col_index, &raw_buffer);
-                
-                // println!("{:?}", target_pixel);
-                target_side.extend_from_slice(&target_pixel);
-            }
+        for (left_pixel, right_pixel) in height_results.into_iter() {
+            self.left.extend_from_slice(&left_pixel);
+            self.right.extend_from_slice(&right_pixel);
         }
 
         // Reverse this sides to correct displaying
@@ -133,14 +144,15 @@ impl GraphicsCaptureApiHandler for Capture {
         self.com_port.write(top.as_slice()).unwrap();
         self.com_port.write(self.left.as_slice()).unwrap();
 
-
         // println!("Elapsed: {}", time_start.elapsed().unwrap().as_secs_f32());
 
         // Gracefully Stop The Capture Thread
         // if self.frames_counter >= 60 {
         //     capture_control.stop();
+        //     println!("{}", (self.total_time_elapsed / 60.0))
         // } else {
         //     self.frames_counter += 1;
+        //     self.total_time_elapsed += time_start.elapsed().unwrap().as_secs_f32();
         // }
         self.release_sides_buffers();
 

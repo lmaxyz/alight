@@ -47,8 +47,8 @@ fn start_com_ports_observer(main_window_weak: Weak<MainWindow>) {
 
             let _ = main_window_weak.upgrade_in_event_loop(move |w| {
                 let current_ports_model = w.get_available_com_ports();
-                let all_port_present = current_ports_model.iter().zip(&available_ports).all(|(c, a)|c==a);
-                if current_ports_model.row_count() > 0 && available_ports.len() > 0 && all_port_present {
+                let all_ports_present = current_ports_model.iter().zip(&available_ports).all(|(c, a)|c==a);
+                if current_ports_model.row_count() > 0 && available_ports.len() > 0 && all_ports_present {
                     return
                 };
 
@@ -65,7 +65,7 @@ fn start_com_ports_observer(main_window_weak: Weak<MainWindow>) {
                 w.set_available_com_ports(available_ports_model.into());
                 w.set_selected_com_port(new_selected_port.unwrap_or("".into()));
             });
-            std::thread::sleep(Duration::from_secs(1));
+            std::thread::sleep(Duration::from_secs(500));
         }
     });
 }
@@ -79,7 +79,7 @@ fn start_monitors_observer(main_window_weak: Weak<MainWindow>) {
             let monitors: Vec<Monitor> = Monitor::enumerate().unwrap();
 
             if monitors.len() == handlers.len() && handlers.iter().all(|h: &CaptureControl<Preview, Box<dyn Error + Send + Sync>>| !h.is_finished()) {
-                std::thread::sleep(Duration::from_millis(300));
+                std::thread::sleep(Duration::from_millis(500));
                 continue;
             }
 
@@ -109,8 +109,6 @@ fn start_monitors_observer(main_window_weak: Weak<MainWindow>) {
                 let handler = start_monitor_preview(index, monitor, main_window_weak.clone());
                 handlers.push(handler);
             }
-
-            std::thread::sleep(Duration::from_millis(500));
         }
     });
 }
@@ -140,13 +138,13 @@ fn main() {
     start_monitors_observer(main_window_weak.clone());
   
     let capture_control: Rc<RefCell<Option<CaptureControl<Capture, Box<dyn Error + Send + Sync>>>>> = Rc::new(RefCell::new(None));
-    let capture_control_inner = capture_control.clone();
+    let capture_control_clone = capture_control.clone();
 
     let main_window_clone = main_window_weak.clone();
     
     main_window.on_toggle_capturing(move || {
         let main_window = main_window_clone.unwrap();
-        let mut capture_lock = capture_control_inner.borrow_mut();
+        let mut capture_lock = capture_control_clone.borrow_mut();
         
         if let Some(capture_control) = capture_lock.take() {
             capture_control.stop().unwrap();
@@ -164,14 +162,10 @@ fn main() {
         com_port.set_timeout(Duration::from_millis(100)).unwrap();
 
         let settings = Settings::new(
-            // Item To Captue
             monitor,
-            // Capture Cursor
             CursorCaptureSettings::Default,
             DrawBorderSettings::WithoutBorder,
-            // Kind Of Pixel Format For Frame To Have
             ColorFormat::Rgba8,
-            // Will Be Passed To The New Function
             com_port,
         );
 

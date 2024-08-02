@@ -15,7 +15,7 @@ export component MainWindow inherits Window {
 
     in-out property <bool> is_capture_running: false;
 
-    title: "Alive Backlight";
+    title: "Alight";
 
     VerticalBox {
 
@@ -30,7 +30,7 @@ export component MainWindow inherits Window {
                 Text { text: "COM PORT"; }
     
                 com_port_selector := ComboBox {
-                    enabled: self.model.length > 0 ? true : false;
+                    enabled: self.model.length > 0 ? is_capture_running ? false : true : false;
                 }
             }
             
@@ -39,7 +39,7 @@ export component MainWindow inherits Window {
                 alignment: LayoutAlignment.end;
 
                 Button {
-                    text: !root.is_capture_running ? "Start capturing" : "Stop capturing";
+                    text: is_capture_running ? "Enable" : "Disable";
                     enabled: root.selected_com_port != "" && monitor_selector.selected_monitor > 0 ? true : false;
 
                     clicked => {
@@ -65,6 +65,7 @@ export component MainWindow inherits Window {
             Text { text: "Monitors"; font-size: 18px; font-weight: 600; }
 
             monitor_selector := MonitorSelector {
+                enabled: is_capture_running ? false : true;
                 alignment: LayoutAlignment.start;
             }
         }

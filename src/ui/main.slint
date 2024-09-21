@@ -16,18 +16,24 @@ export component MainWindow inherits Window {
     in-out property <bool> is_capture_running: false;
 
     title: "Alight";
+    background: @linear-gradient(30deg, rgb(150, 240, 170) 0, rgb(250, 150, 170) 50%, rgb(150, 150, 240) 100%);
 
     VerticalBox {
 
         HorizontalBox {
             alignment: LayoutAlignment.space-between;
             max-height: 70px;
-    
+
             VerticalBox {
                 padding: 0;
                 alignment: LayoutAlignment.end;
                 
-                Text { text: "COM PORT"; }
+                Text {
+                    text: "COM PORT";
+                    color: white;
+                    font-weight: 600;
+                    font-size: 14px;
+                }
     
                 com_port_selector := ComboBox {
                     enabled: self.model.length > 0 ? is_capture_running ? false : true : false;
@@ -39,7 +45,7 @@ export component MainWindow inherits Window {
                 alignment: LayoutAlignment.end;
 
                 Button {
-                    text: is_capture_running ? "Enable" : "Disable";
+                    text: is_capture_running ? "Выключить" : "Включить";
                     enabled: root.selected_com_port != "" && monitor_selector.selected_monitor > 0 ? true : false;
 
                     clicked => {
@@ -54,7 +60,7 @@ export component MainWindow inherits Window {
 
             Rectangle {
                 height: 2px;
-                background: #cccccc;
+                background: #f0efef;
                 border-radius: 1px;
             }
         }
@@ -62,7 +68,12 @@ export component MainWindow inherits Window {
         VerticalBox {
             alignment: LayoutAlignment.start;
 
-            Text { text: "Monitors"; font-size: 18px; font-weight: 600; }
+            Text {
+                text: "Monitors";
+                font-size: 18px;
+                font-weight: 600;
+                color: white;
+            }
 
             monitor_selector := MonitorSelector {
                 enabled: is_capture_running ? false : true;

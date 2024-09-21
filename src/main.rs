@@ -10,7 +10,7 @@ use windows_capture::{
     monitor::Monitor, settings::{ColorFormat, Settings},
     settings::{DrawBorderSettings, CursorCaptureSettings}
 };
-use image::io::Reader as ImageReader;
+use image::{DynamicImage, ImageReader};
 
 mod screen_capture;
 mod preview;
@@ -21,6 +21,8 @@ use screen_capture::Capture;
 slint::include_modules!();
 
 const MAX_TITLE_LEN: usize = 32;
+
+type CaptureControlRef = Rc<RefCell<Option<CaptureControl<Capture, Box<dyn Error + Send + Sync>>>>>;
 
 
 fn get_monitor_title(monitor: &Monitor) -> String {
@@ -65,7 +67,7 @@ fn start_com_ports_observer(main_window_weak: Weak<MainWindow>) {
                 w.set_available_com_ports(available_ports_model.into());
                 w.set_selected_com_port(new_selected_port.unwrap_or("".into()));
             });
-            std::thread::sleep(Duration::from_secs(500));
+            std::thread::sleep(Duration::from_millis(500));
         }
     });
 }
@@ -73,8 +75,12 @@ fn start_com_ports_observer(main_window_weak: Weak<MainWindow>) {
 
 fn start_monitors_observer(main_window_weak: Weak<MainWindow>) {
     let image_bytes = include_bytes!("../monitor-icon.jpg");
+    let img: DynamicImage = ImageReader::new(Cursor::new(image_bytes)).with_guessed_format().unwrap().decode().unwrap();
+    let pix_buff = SharedPixelBuffer::clone_from_slice(&img.to_rgba8(), img.width(), img.height());
+    
     std::thread::spawn(move || {
         let mut handlers = Vec::new();
+
         loop {
             let monitors: Vec<Monitor> = Monitor::enumerate().unwrap();
 
@@ -86,19 +92,18 @@ fn start_monitors_observer(main_window_weak: Weak<MainWindow>) {
             for handler in handlers.into_iter() {
                 handler.stop().unwrap();
             }
-            
+
             handlers = Vec::new();
+            let pix_buff = pix_buff.clone();
             
             let monitors_copy = monitors.clone();
-            let img = ImageReader::new(Cursor::new(image_bytes)).with_guessed_format().unwrap().decode().unwrap();
             let _ = main_window_weak.upgrade_in_event_loop(move |w| {
-                let monitor_mock = img.as_bytes();
-                let pix_buff = SharedPixelBuffer::clone_from_slice(monitor_mock, 1000, 847);
+                let mon_mock = slint::Image::from_rgba8(pix_buff);
                 let monitors_vec = monitors_copy.iter().map(|m| {
                     let title = get_monitor_title(m);
                     MonitorData{
                         title: title.into(),
-                        image: slint::Image::from_rgb8(pix_buff.clone()),
+                        image: mon_mock.clone(),
                     }
                 }).collect::<Vec<MonitorData>>();
                 let monitors_vec_model = Rc::new(VecModel::from(monitors_vec));
@@ -132,46 +137,49 @@ fn start_monitor_preview(index: usize, monitor: Monitor, main_window_weak: Weak<
 
 fn main() {
     let main_window = MainWindow::new().unwrap();
-    let main_window_weak = main_window.as_weak();
 
-    start_com_ports_observer(main_window_weak.clone());
-    start_monitors_observer(main_window_weak.clone());
+    let capture_control: CaptureControlRef = Rc::new(RefCell::new(None));
+
+    start_com_ports_observer(main_window.as_weak());
+    start_monitors_observer(main_window.as_weak());
   
-    let capture_control: Rc<RefCell<Option<CaptureControl<Capture, Box<dyn Error + Send + Sync>>>>> = Rc::new(RefCell::new(None));
     let capture_control_clone = capture_control.clone();
-
-    let main_window_clone = main_window_weak.clone();
     
-    main_window.on_toggle_capturing(move || {
-        let main_window = main_window_clone.unwrap();
-        let mut capture_lock = capture_control_clone.borrow_mut();
-        
-        if let Some(capture_control) = capture_lock.take() {
-            capture_control.stop().unwrap();
-            main_window.set_is_capture_running(false);
-            return
+    main_window.on_toggle_capturing({
+        let main_window_weak = main_window.as_weak();
+        move || {
+            let main_window = main_window_weak.unwrap();
+            let mut capture_lock = capture_control_clone.borrow_mut();
+            
+            if let Some(capture_control) = capture_lock.take() {
+                if !capture_control.is_finished() {
+                    capture_control.stop().unwrap();
+                    main_window.set_is_capture_running(false);
+                    return
+                }
+            }
+
+            let selected_com_port = main_window.get_selected_com_port();
+
+            let selected_monitor_idx = main_window.get_selected_monitor() as usize;
+            let monitor = Monitor::from_index(selected_monitor_idx).unwrap();
+
+            let com_port_builder = new(selected_com_port.to_string(), 250000);
+            let mut com_port = com_port_builder.open().unwrap();
+            com_port.set_timeout(Duration::from_millis(100)).unwrap();
+
+            let settings = Settings::new(
+                monitor,
+                CursorCaptureSettings::Default,
+                DrawBorderSettings::WithoutBorder,
+                ColorFormat::Rgba8,
+                (com_port, main_window_weak.clone()),
+            );
+
+            main_window.set_is_capture_running(true);
+            let capture_control: CaptureControl<Capture, Box<dyn Error + Send + Sync>> = Capture::start_free_threaded(settings).unwrap();
+            *capture_lock = Some(capture_control);
         }
-
-        let selected_com_port = main_window.get_selected_com_port();
-
-        let selected_monitor_idx = main_window.get_selected_monitor() as usize;
-        let monitor = Monitor::from_index(selected_monitor_idx).unwrap();
-
-        let com_port_builder = new(selected_com_port.to_string(), 250000);
-        let mut com_port = com_port_builder.open().unwrap();
-        com_port.set_timeout(Duration::from_millis(100)).unwrap();
-
-        let settings = Settings::new(
-            monitor,
-            CursorCaptureSettings::Default,
-            DrawBorderSettings::WithoutBorder,
-            ColorFormat::Rgba8,
-            com_port,
-        );
-
-        main_window.set_is_capture_running(true);
-        let capture_control: CaptureControl<Capture, Box<dyn Error + Send + Sync>> = Capture::start_free_threaded(settings).unwrap();
-        *capture_lock = Some(capture_control);
     });
 
     main_window.run().unwrap();

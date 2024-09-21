@@ -55,10 +55,10 @@ impl GraphicsCaptureApiHandler for Preview {
         });
 
         #[cfg(not(debug_assertions))]
-        std::thread::sleep(std::time::Duration::from_millis(42));
+        std::thread::sleep(std::time::Duration::from_millis(25));
 
         #[cfg(debug_assertions)]
-        std::thread::sleep(std::time::Duration::from_millis(150));
+        std::thread::sleep(std::time::Duration::from_millis(50));
 
         Ok(())
     }

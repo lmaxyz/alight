@@ -1,6 +1,7 @@
-// use std::time::SystemTime;
-
+use std::{thread, time::{Duration, SystemTime}};
+use tracing::debug;
 use serialport::SerialPort;
+use slint::Weak;
 use windows_capture::{
     capture::GraphicsCaptureApiHandler,
     frame::Frame,
@@ -8,14 +9,28 @@ use windows_capture::{
 };
 use rayon::prelude::*;
 
+use crate::MainWindow;
 
-const LEDS_WIDTH: u32 = 28;
-const LEDS_HEIGHT: u32 = 20;
+
+const HORIZONTAL_LEDS_NUM: u32 = 28;
+const VERTICAL_LEDS_NUM: u32 = 18;
+
+const HORIZONTAL_MULTIPLIER: u32 = 2;
+const VERTICAL_MULTIPLIER: u32 = 2;
+
+
+pub struct CaptureSettings {
+    pub horizontal_leds_num: u32,
+    pub vertical_leds_num: u32,
+    pub grab_horizontal_offset: u32,
+    pub grab_vertical_offset: u32
+}
 
 
 // Struct To Implement The Trait For
 pub struct Capture {
     com_port: Box<dyn SerialPort>,
+    main_window: Weak<MainWindow>,
 
     left: Vec<u8>,
     right: Vec<u8>,
@@ -34,12 +49,13 @@ impl Capture {
         self.bottom.clear();
     }
 
-    fn calc_target_pixel(source_index: u32, subrow_len: u32, subcol_len: u32, row_pitch: u32, target_col_index: u32, raw_buffer: &[u8]) -> [u8; 3] {
+
+    fn calc_target_pixel(source_index: u32, subrow_len: u32, subcol_len: u32, row_pitch: u32, target_col_index: u32, horizontal_multiplier: u32, vertical_multiplier: u32, raw_buffer: &[u8]) -> [u8; 3] {
         let mut target_pixel_sum = (0,0,0,0);
-        let target_col_index_offset = target_col_index * 4;
-        for subrow in 0..subrow_len {
-            let start_index = source_index + (subrow * row_pitch) + (target_col_index_offset * subcol_len);
-            let end_index = start_index + subcol_len * 4;
+        let target_col_index_offset = (target_col_index * 4) * subcol_len;
+        for subrow in 0..subrow_len*vertical_multiplier {
+            let start_index = source_index + (subrow * row_pitch) + target_col_index_offset;
+            let end_index = start_index + subcol_len * horizontal_multiplier * 4;
             let subrow_pixel_sum = raw_buffer[start_index as usize .. end_index as usize].chunks(4).fold((0,0,0),|mut acc:(u32,u32,u32), x| {
                 acc.0 += x[0] as u32;
                 acc.1 += x[1] as u32;
@@ -47,21 +63,21 @@ impl Capture {
                 acc
             });
 
-            target_pixel_sum.0 += subrow_pixel_sum.0 / subcol_len;
-            target_pixel_sum.1 += subrow_pixel_sum.1 / subcol_len;
-            target_pixel_sum.2 += subrow_pixel_sum.2 / subcol_len;
+            target_pixel_sum.0 += subrow_pixel_sum.0 / (subcol_len*horizontal_multiplier);
+            target_pixel_sum.2 += subrow_pixel_sum.2 / (subcol_len*horizontal_multiplier);
+            target_pixel_sum.1 += subrow_pixel_sum.1 / (subcol_len*horizontal_multiplier);
         }
         [
-            (target_pixel_sum.0 / subrow_len) as u8,
-            (target_pixel_sum.1 / subrow_len) as u8,
-            (target_pixel_sum.2 / subrow_len) as u8
+            (target_pixel_sum.0 / (subrow_len*vertical_multiplier)) as u8,
+            (target_pixel_sum.1 / (subrow_len*vertical_multiplier)) as u8,
+            (target_pixel_sum.2 / (subrow_len*vertical_multiplier)) as u8
         ]
     }
 }
 
 impl GraphicsCaptureApiHandler for Capture {
     // To Get The Message From The Settings
-    type Flags = Box<dyn SerialPort>;
+    type Flags = (Box<dyn SerialPort>, Weak<MainWindow>);
     // type Flags = String;
 
     // To Redirect To CaptureControl Or Start Method
@@ -69,14 +85,15 @@ impl GraphicsCaptureApiHandler for Capture {
 
     // Function That Will Be Called To Create The Struct The Flags Can Be Passed
     // From `WindowsCaptureSettings`
-    fn new(com_port: Self::Flags) -> Result<Self, Self::Error> {
-        let left: Vec<u8> = Vec::with_capacity((LEDS_HEIGHT*3) as usize);
-        let right: Vec<u8> = Vec::with_capacity((LEDS_HEIGHT*3) as usize);
-        let top: Vec<u8> = Vec::with_capacity((LEDS_WIDTH*3) as usize);
-        let bottom: Vec<u8> = Vec::with_capacity((LEDS_WIDTH*3) as usize);
+    fn new((com_port, main_window): Self::Flags) -> Result<Self, Self::Error> {
+        let left: Vec<u8> = Vec::with_capacity((VERTICAL_LEDS_NUM*3) as usize);
+        let right: Vec<u8> = Vec::with_capacity((VERTICAL_LEDS_NUM*3) as usize);
+        let top: Vec<u8> = Vec::with_capacity((HORIZONTAL_LEDS_NUM*3) as usize);
+        let bottom: Vec<u8> = Vec::with_capacity((HORIZONTAL_LEDS_NUM*3) as usize);
 
         Ok(Self {
             com_port,
+            main_window,
             left,
             right,
             top, 
@@ -93,23 +110,23 @@ impl GraphicsCaptureApiHandler for Capture {
         _capture_control: InternalCaptureControl,
     ) -> Result<(), Self::Error> {
         // Check performance
-        // let time_start = SystemTime::now();
+        let time_start = SystemTime::now();
         
         let mut frame_buffer = frame.buffer().unwrap();
         let row_pitch = frame_buffer.row_pitch();
-        let subcol_len = frame_buffer.width() / LEDS_WIDTH;
-        let subrow_len = frame_buffer.height() / LEDS_HEIGHT;
+        let subcol_width = frame_buffer.width() / (HORIZONTAL_LEDS_NUM);
+        let subrow_height = frame_buffer.height() / (VERTICAL_LEDS_NUM);
 
         let raw_buffer = frame_buffer.as_raw_buffer();
 
-        let source_top_index = 0 * subrow_len * row_pitch;
-        let source_bottom_index = (LEDS_HEIGHT-1) * subrow_len * row_pitch;
+        let source_top_index = 0 * subrow_height * row_pitch;
+        let source_bottom_index = (VERTICAL_LEDS_NUM-VERTICAL_MULTIPLIER) * subrow_height * row_pitch;
 
-        let width_results: Vec<([u8; 3], [u8; 3])> = (0..LEDS_WIDTH).into_par_iter().map(|target_col_index| {
+        let width_results: Vec<([u8; 3], [u8; 3])> = (0..HORIZONTAL_LEDS_NUM).into_par_iter().map(|target_col_index| {
             // calc top
-            let top_pixel = Capture::calc_target_pixel(source_top_index, subrow_len, subcol_len, row_pitch, target_col_index, &raw_buffer);
+            let top_pixel = Capture::calc_target_pixel(source_top_index, subrow_height, subcol_width, row_pitch, target_col_index, 1, VERTICAL_MULTIPLIER, &raw_buffer);
             // calc bottom
-            let bottom_pixel = Capture::calc_target_pixel(source_bottom_index, subrow_len, subcol_len, row_pitch, target_col_index, &raw_buffer);
+            let bottom_pixel = Capture::calc_target_pixel(source_bottom_index, subrow_height, subcol_width, row_pitch, target_col_index-VERTICAL_MULTIPLIER, 1, VERTICAL_MULTIPLIER, &raw_buffer);
 
             (top_pixel, bottom_pixel)
         }).collect();
@@ -119,13 +136,13 @@ impl GraphicsCaptureApiHandler for Capture {
             self.bottom.extend_from_slice(&bottom_pixel);
         }
 
-        let height_results: Vec<([u8; 3], [u8; 3])> = (1..LEDS_HEIGHT).into_par_iter().map(|target_row_index| {
-            let source_index = target_row_index * subrow_len * row_pitch;
+        let height_results: Vec<([u8; 3], [u8; 3])> = (1..VERTICAL_LEDS_NUM).into_par_iter().map(|target_row_index| {
+            let source_index = target_row_index * subrow_height * row_pitch;
 
             // calc right
-            let right_pixel = Capture::calc_target_pixel(source_index, subrow_len, subcol_len, row_pitch, LEDS_WIDTH-1, &raw_buffer);
+            let right_pixel = Capture::calc_target_pixel(source_index, subrow_height, subcol_width, row_pitch, HORIZONTAL_LEDS_NUM-HORIZONTAL_MULTIPLIER, HORIZONTAL_MULTIPLIER, 1, &raw_buffer);
             // calc left
-            let left_pixel = Capture::calc_target_pixel(source_index, subrow_len, subcol_len, row_pitch, 0, &raw_buffer);
+            let left_pixel = Capture::calc_target_pixel(source_index, subrow_height, subcol_width, row_pitch, 0, HORIZONTAL_MULTIPLIER, 1, &raw_buffer);
 
             (left_pixel, right_pixel)
         }).collect();
@@ -136,34 +153,40 @@ impl GraphicsCaptureApiHandler for Capture {
         }
 
         // Reverse this sides to correct displaying
-        let top:Vec<u8>  = self.top.chunks(3).rev().flatten().map(|x| *x).collect();
-        let right:Vec<u8>  = self.right.chunks(3).rev().flatten().map(|x| *x).collect();
+        self.top = self.top.chunks(3).rev().flatten().map(|x| *x).collect();
+        self.right  = self.right.chunks(3).rev().flatten().map(|x| *x).collect();
         self.com_port.write(b"Ada").unwrap();
         self.com_port.write(self.bottom.as_slice()).unwrap();
-        self.com_port.write(right.as_slice()).unwrap();
-        self.com_port.write(top.as_slice()).unwrap();
+        self.com_port.write(self.right.as_slice()).unwrap();
+        self.com_port.write(self.top.as_slice()).unwrap();
         self.com_port.write(self.left.as_slice()).unwrap();
 
-        // println!("Elapsed: {}", time_start.elapsed().unwrap().as_secs_f32());
+        // Holds 60 FPS
+        if let Ok(elapsed) = time_start.elapsed() {
+            let wait_time = 16666 - elapsed.as_micros();
+            if elapsed.as_micros() < 16666 {
+                thread::sleep(Duration::from_micros(wait_time as u64));
+            }
+        }
 
-        // Gracefully Stop The Capture Thread
-        // if self.frames_counter >= 60 {
-        //     capture_control.stop();
-        //     println!("{}", (self.total_time_elapsed / 60.0))
+        // if self.total_time_elapsed >= 1.0 {
+        //     debug!("FPS: {}", self.frames_counter);
+        //     self.frames_counter = 0;
+        //     self.total_time_elapsed = 0.0;
         // } else {
         //     self.frames_counter += 1;
         //     self.total_time_elapsed += time_start.elapsed().unwrap().as_secs_f32();
         // }
         self.release_sides_buffers();
-
+        
         Ok(())
     }
 
     // Called When The Capture Item Closes Usually When The Window Closes, Capture
     // Session Will End After This Function Ends
     fn on_closed(&mut self) -> Result<(), Self::Error> {
-        println!("Capture Session Closed");
-
+        debug!("Capture Session Closed");
+        self.main_window.upgrade_in_event_loop(|w| { w.set_is_capture_running(false) }).unwrap();
         Ok(())
     }
 }

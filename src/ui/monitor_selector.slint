@@ -15,7 +15,7 @@ component MonitorItem inherits Rectangle {
     width: 400px;
     height: 260px;
     border-width: selected ? 4px : 2px;
-    border-color: selected ? #f1d69b : gray;
+    border-color: selected ? #f1d69b : whitesmoke;
     border-radius: 5px;
 
     animate border-width {
@@ -35,6 +35,7 @@ component MonitorItem inherits Rectangle {
         max-width: 15px;
         font-size: 14px;
         font-weight: 600;
+        color: selected ? #fff2a6 : whitesmoke;
     }
 
     Image {

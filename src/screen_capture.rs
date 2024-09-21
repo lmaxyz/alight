@@ -136,7 +136,7 @@ impl GraphicsCaptureApiHandler for Capture {
             self.bottom.extend_from_slice(&bottom_pixel);
         }
 
-        let height_results: Vec<([u8; 3], [u8; 3])> = (1..VERTICAL_LEDS_NUM).into_par_iter().map(|target_row_index| {
+        let height_results: Vec<([u8; 3], [u8; 3])> = (0..VERTICAL_LEDS_NUM).into_par_iter().map(|target_row_index| {
             let source_index = target_row_index * subrow_height * row_pitch;
 
             // calc right

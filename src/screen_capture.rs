@@ -26,6 +26,11 @@ pub struct CaptureSettings {
     pub grab_vertical_offset: u32
 }
 
+fn make_pixel_colorful(pixel: &mut [u8]) {
+    let pix_part = pixel.iter_mut().max().unwrap();
+    if *pix_part > 50 && *pix_part <= 200 { *pix_part += 40 };
+}
+
 
 // Struct To Implement The Trait For
 pub struct Capture {
@@ -52,10 +57,12 @@ impl Capture {
 
     fn calc_target_pixel(source_index: u32, subrow_len: u32, subcol_len: u32, row_pitch: u32, target_col_index: u32, horizontal_multiplier: u32, vertical_multiplier: u32, raw_buffer: &[u8]) -> [u8; 3] {
         let mut target_pixel_sum = (0,0,0,0);
-        let target_col_index_offset = (target_col_index * 4) * subcol_len;
+        let subcol_calc_len = subcol_len * horizontal_multiplier * 4;
+        let target_col_index_offset = target_col_index * 4 * subcol_len;
+        
         for subrow in 0..subrow_len*vertical_multiplier {
             let start_index = source_index + (subrow * row_pitch) + target_col_index_offset;
-            let end_index = start_index + subcol_len * horizontal_multiplier * 4;
+            let end_index = start_index + subcol_calc_len;
             let subrow_pixel_sum = raw_buffer[start_index as usize .. end_index as usize].chunks(4).fold((0,0,0),|mut acc:(u32,u32,u32), x| {
                 acc.0 += x[0] as u32;
                 acc.1 += x[1] as u32;
@@ -111,11 +118,11 @@ impl GraphicsCaptureApiHandler for Capture {
     ) -> Result<(), Self::Error> {
         // Check performance
         let time_start = SystemTime::now();
-        
+
         let mut frame_buffer = frame.buffer().unwrap();
         let row_pitch = frame_buffer.row_pitch();
-        let subcol_width = frame_buffer.width() / (HORIZONTAL_LEDS_NUM);
-        let subrow_height = frame_buffer.height() / (VERTICAL_LEDS_NUM);
+        let subcol_width = frame_buffer.width() / HORIZONTAL_LEDS_NUM;
+        let subrow_height = frame_buffer.height() / VERTICAL_LEDS_NUM;
 
         let raw_buffer = frame_buffer.as_raw_buffer();
 
@@ -124,9 +131,12 @@ impl GraphicsCaptureApiHandler for Capture {
 
         let width_results: Vec<([u8; 3], [u8; 3])> = (0..HORIZONTAL_LEDS_NUM).into_par_iter().map(|target_col_index| {
             // calc top
-            let top_pixel = Capture::calc_target_pixel(source_top_index, subrow_height, subcol_width, row_pitch, target_col_index, 1, VERTICAL_MULTIPLIER, &raw_buffer);
+            let mut top_pixel = Capture::calc_target_pixel(source_top_index, subrow_height, subcol_width, row_pitch, target_col_index, 1, VERTICAL_MULTIPLIER, &raw_buffer);
+            make_pixel_colorful(&mut top_pixel);
+
             // calc bottom
-            let bottom_pixel = Capture::calc_target_pixel(source_bottom_index, subrow_height, subcol_width, row_pitch, target_col_index-VERTICAL_MULTIPLIER, 1, VERTICAL_MULTIPLIER, &raw_buffer);
+            let mut bottom_pixel = Capture::calc_target_pixel(source_bottom_index, subrow_height, subcol_width, row_pitch, target_col_index-VERTICAL_MULTIPLIER, 1, VERTICAL_MULTIPLIER, &raw_buffer);
+            make_pixel_colorful(&mut bottom_pixel);
 
             (top_pixel, bottom_pixel)
         }).collect();
@@ -140,9 +150,13 @@ impl GraphicsCaptureApiHandler for Capture {
             let source_index = target_row_index * subrow_height * row_pitch;
 
             // calc right
-            let right_pixel = Capture::calc_target_pixel(source_index, subrow_height, subcol_width, row_pitch, HORIZONTAL_LEDS_NUM-HORIZONTAL_MULTIPLIER, HORIZONTAL_MULTIPLIER, 1, &raw_buffer);
+            let mut right_pixel = Capture::calc_target_pixel(source_index, subrow_height, subcol_width, row_pitch, HORIZONTAL_LEDS_NUM-HORIZONTAL_MULTIPLIER, HORIZONTAL_MULTIPLIER, 1, &raw_buffer);
+            make_pixel_colorful(&mut right_pixel);
+            
             // calc left
-            let left_pixel = Capture::calc_target_pixel(source_index, subrow_height, subcol_width, row_pitch, 0, HORIZONTAL_MULTIPLIER, 1, &raw_buffer);
+            let mut left_pixel = Capture::calc_target_pixel(source_index, subrow_height, subcol_width, row_pitch, 0, HORIZONTAL_MULTIPLIER, 1, &raw_buffer);
+            make_pixel_colorful(&mut left_pixel);
+            
 
             (left_pixel, right_pixel)
         }).collect();

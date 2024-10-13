@@ -1,22 +1,22 @@
+use ring_channel::RingSender;
+use tracing::debug;
 use windows_capture::{
     capture::GraphicsCaptureApiHandler,
     frame::Frame,
     graphics_capture_api::InternalCaptureControl
 };
 
-use crate::MainWindow;
-use slint::{Image as SlintImg, Weak};
+use slint::{Rgba8Pixel, SharedPixelBuffer};
 
 pub struct Preview {
-    title: String,
-    index: usize,
-    main_window: Weak<MainWindow>
+    index: i32,
+    preview_channel: RingSender<(i32, SharedPixelBuffer<Rgba8Pixel>)>
 }
 
 
 impl GraphicsCaptureApiHandler for Preview {
     // To Get The Message From The Settings
-    type Flags = (String, usize, Weak<MainWindow>);
+    type Flags = (usize, RingSender<(i32, SharedPixelBuffer<Rgba8Pixel>)>);
 
     // To Redirect To CaptureControl Or Start Method
     type Error = Box<dyn std::error::Error + Send + Sync>;
@@ -24,14 +24,12 @@ impl GraphicsCaptureApiHandler for Preview {
     // Function That Will Be Called To Create The Struct The Flags Can Be Passed
     // From `WindowsCaptureSettings`
     fn new(monitors_data: Self::Flags) -> Result<Self, Self::Error> {
-        let title = monitors_data.0;
-        let index = monitors_data.1;
-        let main_window = monitors_data.2;
+        let index = monitors_data.0 as i32;
+        let preview_channel = monitors_data.1;
 
         Ok(Preview{
-            title,
             index,
-            main_window
+            preview_channel
         })
     }
 
@@ -45,20 +43,15 @@ impl GraphicsCaptureApiHandler for Preview {
         let height = frame_buffer.height();
         let raw_buffer = Vec::from(frame_buffer.as_raw_buffer());
 
-        let title: slint::SharedString = self.title.as_str().into();
-        let index = self.index as i32;
         let buff = slint::SharedPixelBuffer::clone_from_slice(&raw_buffer, width, height);
 
-        let _ = self.main_window.upgrade_in_event_loop(move |w| {
-            let slint_img = SlintImg::from_rgba8(buff);
-            w.invoke_update_monitor_preview(index, title, slint_img);
-        });
+        self.preview_channel.send((self.index, buff)).unwrap();
 
         #[cfg(not(debug_assertions))]
-        std::thread::sleep(std::time::Duration::from_millis(25));
+        std::thread::sleep(std::time::Duration::from_millis(5));
 
         #[cfg(debug_assertions)]
-        std::thread::sleep(std::time::Duration::from_millis(50));
+        std::thread::sleep(std::time::Duration::from_millis(25));
 
         Ok(())
     }
@@ -66,7 +59,7 @@ impl GraphicsCaptureApiHandler for Preview {
     // Called When The Capture Item Closes Usually When The Window Closes, Capture
     // Session Will End After This Function Ends
     fn on_closed(&mut self) -> Result<(), Self::Error> {
-        println!("Preview for {} monitor stopped", self.title);
+        debug!("Preview #{} stopped", self.index);
 
         Ok(())
     }

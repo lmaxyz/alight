@@ -18,8 +18,8 @@ const VERTICAL_LEDS_NUM: u32 = 18;
 const HORIZONTAL_MULTIPLIER: u32 = 2;
 const VERTICAL_MULTIPLIER: u32 = 2;
 
-
-pub struct CaptureSettings {
+// ToDo: Use it to pass config from UI
+pub struct _CaptureSettings {
     pub horizontal_leds_num: u32,
     pub vertical_leds_num: u32,
     pub grab_horizontal_offset: u32,

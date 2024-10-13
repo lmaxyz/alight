@@ -32,6 +32,7 @@ component MonitorItem inherits Rectangle {
         x: (parent.width / 2) - (self.width / 2);
         y: 8px;
         text: parent.title;
+        overflow: elide;
         max-width: 15px;
         font-size: 14px;
         font-weight: 600;
@@ -53,10 +54,9 @@ export component MonitorSelector inherits HorizontalBox {
     in-out property <int> selected_monitor;
     in-out property <[MonitorData]> monitors_data;
 
-    callback update_monitor_preview(int, string, image);
+    callback update_monitor_preview(int, image);
 
-    update_monitor_preview(index, title, image_data) => {
-        self.monitors_data[index].title = title;
+    update_monitor_preview(index, image_data) => {
         self.monitors_data[index].image = image_data;
     }
 

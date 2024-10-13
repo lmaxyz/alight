@@ -46,13 +46,9 @@ impl GraphicsCaptureApiHandler for Preview {
         let buff = slint::SharedPixelBuffer::clone_from_slice(&raw_buffer, width, height);
 
         self.preview_channel.send((self.index, buff)).unwrap();
-        // let _ = self.main_window.upgrade_in_event_loop(move |w| {
-        //     let slint_img = SlintImg::from_rgba8(buff);
-        //     w.invoke_update_monitor_preview(index, title, slint_img);
-        // });
 
-        // #[cfg(not(debug_assertions))]
-        // std::thread::sleep(std::time::Duration::from_millis(5));
+        #[cfg(not(debug_assertions))]
+        std::thread::sleep(std::time::Duration::from_millis(5));
 
         #[cfg(debug_assertions)]
         std::thread::sleep(std::time::Duration::from_millis(25));

@@ -13,7 +13,6 @@ pub struct Preview {
     preview_channel: RingSender<(i32, SharedPixelBuffer<Rgba8Pixel>)>
 }
 
-
 impl GraphicsCaptureApiHandler for Preview {
     // To Get The Message From The Settings
     type Flags = (usize, RingSender<(i32, SharedPixelBuffer<Rgba8Pixel>)>);

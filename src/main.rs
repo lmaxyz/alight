@@ -100,11 +100,10 @@ fn start_monitors_observer(main_window_weak: Weak<MainWindow>, tx: RingSender<(i
             }
 
             stop_all_previews(&mut handlers);
-
-            let pix_buff = pix_buff.clone();
             
             let _ = main_window_weak.upgrade_in_event_loop({
                 let monitors_titles: Vec<String> = monitors.iter().map(|m| get_monitor_title(m)).collect();
+                let pix_buff = pix_buff.clone();
                 
                 move |w| {
                     let mon_mock = slint::Image::from_rgba8(pix_buff);

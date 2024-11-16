@@ -1,7 +1,7 @@
 use ring_channel::RingSender;
 use tracing::debug;
 use windows_capture::{
-    capture::GraphicsCaptureApiHandler,
+    capture::{Context, GraphicsCaptureApiHandler},
     frame::Frame,
     graphics_capture_api::InternalCaptureControl
 };
@@ -22,9 +22,9 @@ impl GraphicsCaptureApiHandler for Preview {
 
     // Function That Will Be Called To Create The Struct The Flags Can Be Passed
     // From `WindowsCaptureSettings`
-    fn new(monitors_data: Self::Flags) -> Result<Self, Self::Error> {
-        let index = monitors_data.0 as i32;
-        let preview_channel = monitors_data.1;
+    fn new(monitors_data: Context<Self::Flags>) -> Result<Self, Self::Error> {
+        let index = monitors_data.flags.0 as i32;
+        let preview_channel = monitors_data.flags.1;
 
         Ok(Preview{
             index,

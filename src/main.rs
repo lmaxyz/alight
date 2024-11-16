@@ -154,8 +154,9 @@ fn main() {
 
     let (tx, rx) = ring_channel(std::num::NonZeroUsize::try_from(1).unwrap());
 
-    // May be usefull if we want more smoothely preview update without debug flags
-    // Takes more CPU resources
+    // May be usefull if you want more smoothely preview update without debug flags.
+    // But it takes more CPU resources.
+
     // std::thread::spawn({
     //     let main_weak = main_window.as_weak();
     //     move || {

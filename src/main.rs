@@ -1,4 +1,3 @@
-use std::thread;
 use std::{cell::RefCell, io::Cursor};
 use std::error::Error;
 use std::time::Duration;
@@ -7,7 +6,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 
 use ring_channel::{ring_channel, RingSender};
 use serialport::{available_ports, SerialPortType};
-use slint::{Image, Rgba8Pixel, Model, RenderingState, SharedPixelBuffer, VecModel, Weak};
+use slint::{Image, Rgba8Pixel, Model, SharedPixelBuffer, VecModel, Weak};
 use windows_capture::{
     capture::{GraphicsCaptureApiHandler, CaptureControl},
     monitor::Monitor, settings::{ColorFormat, Settings},
@@ -159,13 +158,13 @@ fn main() {
         let main_weak = main_window.as_weak();
         move || {
             loop {
-                if let Ok((index, monitor_img)) = rx.try_recv() {
+                if let Ok((index, monitor_img)) = rx.recv() {
                     main_weak.upgrade_in_event_loop(move |mw| {
-                        mw.invoke_update_monitor_preview(index, Image::from_rgba8(monitor_img));
+                        mw.invoke_update_monitor_preview(index, Image::from_rgba8_premultiplied(monitor_img));
                         mw.window().request_redraw()
                     }).unwrap();
                 }
-                thread::sleep(Duration::from_millis(5));
+                // thread::sleep(Duration::from_millis(10));
             }
         }
     });

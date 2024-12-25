@@ -40,14 +40,13 @@ impl GraphicsCaptureApiHandler for Preview {
         let mut frame_buffer = frame.buffer().unwrap();
         let width = frame_buffer.width();
         let height = frame_buffer.height();
-        let raw_buffer = Vec::from(frame_buffer.as_raw_buffer());
 
-        let buff = slint::SharedPixelBuffer::clone_from_slice(&raw_buffer, width, height);
+        let buff = slint::SharedPixelBuffer::clone_from_slice(&frame_buffer.as_raw_buffer(), width, height);
 
         self.preview_channel.send((self.index, buff)).unwrap();
 
         #[cfg(not(debug_assertions))]
-        std::thread::sleep(std::time::Duration::from_millis(5));
+        std::thread::sleep(std::time::Duration::from_millis(15));
 
         #[cfg(debug_assertions)]
         std::thread::sleep(std::time::Duration::from_millis(25));

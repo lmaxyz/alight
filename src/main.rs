@@ -1,3 +1,4 @@
+use std::thread;
 use std::{cell::RefCell, io::Cursor};
 use std::error::Error;
 use std::time::Duration;
@@ -154,37 +155,20 @@ fn main() {
 
     let (tx, rx) = ring_channel(std::num::NonZeroUsize::try_from(1).unwrap());
 
-    // May be usefull if you want more smoothely preview update without debug flags.
-    // But it takes more CPU resources.
-
-    // std::thread::spawn({
-    //     let main_weak = main_window.as_weak();
-    //     move || {
-    //         loop {
-    //             if let Ok((index, monitor_img)) = rx.try_recv() {
-    //                 main_weak.upgrade_in_event_loop(move |mw| {
-    //                     mw.invoke_update_monitor_preview(index, Image::from_rgba8(monitor_img));
-    //                     mw.window().request_redraw()
-    //                 }).unwrap();
-    //             }
-    //         }
-    //     }
-    // });
-
-    main_window.window().set_rendering_notifier({
+    std::thread::spawn({
         let main_weak = main_window.as_weak();
-        move |state, _api| {
-            match state {
-                RenderingState::BeforeRendering => {
-                    if let (Some(mw), Ok((index, monitor_img))) = (main_weak.upgrade(), rx.try_recv()) {
+        move || {
+            loop {
+                if let Ok((index, monitor_img)) = rx.try_recv() {
+                    main_weak.upgrade_in_event_loop(move |mw| {
                         mw.invoke_update_monitor_preview(index, Image::from_rgba8(monitor_img));
                         mw.window().request_redraw()
-                    }
-                },
-                _ => {}
+                    }).unwrap();
+                }
+                thread::sleep(Duration::from_millis(5));
             }
         }
-    }).unwrap();
+    });
 
     start_com_ports_observer(main_window.as_weak());
     start_monitors_observer(main_window.as_weak(), tx);

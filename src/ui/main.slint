@@ -11,7 +11,7 @@ export component MainWindow inherits Window {
     in-out property <[string]> available_com_ports <=> com_port_selector.model;
     
     in-out property <int> selected_monitor <=> monitor-selector.selected_monitor;
-    in property <[MonitorData]> monitors_data <=> monitor_selector.monitors_data;
+    in-out property <[MonitorData]> monitors_data <=> monitor_selector.monitors_data;
 
     in-out property <bool> is_capture_running: false;
 

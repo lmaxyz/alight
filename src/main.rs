@@ -106,7 +106,7 @@ fn start_monitors_observer(main_window_weak: Weak<MainWindow>, tx: RingSender<(i
                 let pix_buff = pix_buff.clone();
                 
                 move |w| {
-                    let mon_mock = slint::Image::from_rgba8(pix_buff.clone());
+                    let mon_mock = slint::Image::from_rgba8(pix_buff);
                     let monitors_vec = monitors_titles.iter().map(|title| {
                         MonitorData{
                             title: title.into(),

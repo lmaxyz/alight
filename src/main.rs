@@ -92,7 +92,7 @@ fn start_monitors_observer(main_window_weak: Weak<MainWindow>, tx: RingSender<(i
             }
 
             let monitors: Vec<Monitor> = Monitor::enumerate().unwrap();
-            let all_handlers_active = handlers.iter().all(|h: &CaptureControl<Preview, Box<dyn Error + Send + Sync>>| !h.is_finished());
+            let all_handlers_active = handlers.iter().all(|h| !h.is_finished());
 
             if monitors.len() == handlers.len() && all_handlers_active {
                 std::thread::sleep(Duration::from_millis(500));
@@ -106,7 +106,7 @@ fn start_monitors_observer(main_window_weak: Weak<MainWindow>, tx: RingSender<(i
                 let pix_buff = pix_buff.clone();
                 
                 move |w| {
-                    let mon_mock = slint::Image::from_rgba8(pix_buff);
+                    let mon_mock = slint::Image::from_rgba8(pix_buff.clone());
                     let monitors_vec = monitors_titles.iter().map(|title| {
                         MonitorData{
                             title: title.into(),
@@ -164,7 +164,6 @@ fn main() {
                         mw.window().request_redraw()
                     }).unwrap();
                 }
-                // thread::sleep(Duration::from_millis(10));
             }
         }
     });

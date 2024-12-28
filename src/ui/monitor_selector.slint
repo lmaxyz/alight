@@ -11,9 +11,7 @@ component MonitorItem inherits Rectangle {
     in property <image> image;
     in-out property <string> title;
     in property <bool> selected;
-
-    width: 400px;
-    height: 260px;
+    
     border-width: selected ? 4px : 2px;
     border-color: selected ? #f1d69b : whitesmoke;
     border-radius: 5px;
@@ -42,14 +40,14 @@ component MonitorItem inherits Rectangle {
     Image {
         y: 28px;
         source: root.image;
-        width: 360px;
-        height: 220px;
+        width: parent.width - 40px;
+        height: parent.height - 40px;
     }
 
     touch := TouchArea {}
 }
 
-export component MonitorSelector inherits HorizontalBox {
+export component MonitorSelector inherits VerticalBox {
     in-out property <bool> enabled;
     in-out property <int> selected_monitor;
     in-out property <[MonitorData]> monitors_data;
@@ -60,17 +58,29 @@ export component MonitorSelector inherits HorizontalBox {
         self.monitors_data[index].image = image_data;
     }
 
-    for monitor[i] in monitors_data: MonitorItem {
-        title: monitor.title;
-        image: monitor.image;
-        selected: root.selected_monitor == i+1;
+    Text {
+        text: "Выберите монитор";
+        font-size: 18px;
+        font-weight: 600;
+        color: whitesmoke;
+    }
+    HorizontalBox {
+        alignment: start;
         
-        clicked => {
-            if enabled {
-                if selected_monitor == i+1 {
-                    selected_monitor = 0;
-                } else {
-                    selected_monitor = i+1;
+        for monitor[i] in monitors_data: MonitorItem {
+            title: monitor.title;
+            image: monitor.image;
+            selected: selected_monitor == i+1;
+            width: 512px;
+            height: 288px;
+            
+            clicked => {
+                if enabled {
+                    if selected_monitor == i+1 {
+                        selected_monitor = 0;
+                    } else {
+                        selected_monitor = i+1;
+                    }
                 }
             }
         }

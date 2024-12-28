@@ -6,7 +6,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 
 use ring_channel::{ring_channel, RingSender};
 use serialport::{available_ports, SerialPortType};
-use slint::{Image, Rgba8Pixel, Model, RenderingState, SharedPixelBuffer, VecModel, Weak};
+use slint::{Image, Rgba8Pixel, Model, SharedPixelBuffer, VecModel, Weak};
 use windows_capture::{
     capture::{GraphicsCaptureApiHandler, CaptureControl},
     monitor::Monitor, settings::{ColorFormat, Settings},
@@ -92,7 +92,7 @@ fn start_monitors_observer(main_window_weak: Weak<MainWindow>, tx: RingSender<(i
             }
 
             let monitors: Vec<Monitor> = Monitor::enumerate().unwrap();
-            let all_handlers_active = handlers.iter().all(|h: &CaptureControl<Preview, Box<dyn Error + Send + Sync>>| !h.is_finished());
+            let all_handlers_active = handlers.iter().all(|h| !h.is_finished());
 
             if monitors.len() == handlers.len() && all_handlers_active {
                 std::thread::sleep(Duration::from_millis(500));
@@ -100,11 +100,10 @@ fn start_monitors_observer(main_window_weak: Weak<MainWindow>, tx: RingSender<(i
             }
 
             stop_all_previews(&mut handlers);
-
-            let pix_buff = pix_buff.clone();
             
             let _ = main_window_weak.upgrade_in_event_loop({
                 let monitors_titles: Vec<String> = monitors.iter().map(|m| get_monitor_title(m)).collect();
+                let pix_buff = pix_buff.clone();
                 
                 move |w| {
                     let mon_mock = slint::Image::from_rgba8(pix_buff);
@@ -155,36 +154,19 @@ fn main() {
 
     let (tx, rx) = ring_channel(std::num::NonZeroUsize::try_from(1).unwrap());
 
-    // May be usefull if we want more smoothely preview update without debug flags
-    // Takes more CPU resources
-    // std::thread::spawn({
-    //     let main_weak = main_window.as_weak();
-    //     move || {
-    //         loop {
-    //             if let Ok((index, monitor_img)) = rx.try_recv() {
-    //                 main_weak.upgrade_in_event_loop(move |mw| {
-    //                     mw.invoke_update_monitor_preview(index, Image::from_rgba8(monitor_img));
-    //                     mw.window().request_redraw()
-    //                 }).unwrap();
-    //             }
-    //         }
-    //     }
-    // });
-
-    main_window.window().set_rendering_notifier({
+    std::thread::spawn({
         let main_weak = main_window.as_weak();
-        move |state, _api| {
-            match state {
-                RenderingState::BeforeRendering => {
-                    if let (Some(mw), Ok((index, monitor_img))) = (main_weak.upgrade(), rx.try_recv()) {
-                        mw.invoke_update_monitor_preview(index, Image::from_rgba8(monitor_img));
+        move || {
+            loop {
+                if let Ok((index, monitor_img)) = rx.recv() {
+                    main_weak.upgrade_in_event_loop(move |mw| {
+                        mw.invoke_update_monitor_preview(index, Image::from_rgba8_premultiplied(monitor_img));
                         mw.window().request_redraw()
-                    }
-                },
-                _ => {}
+                    }).unwrap();
+                }
             }
         }
-    }).unwrap();
+    });
 
     start_com_ports_observer(main_window.as_weak());
     start_monitors_observer(main_window.as_weak(), tx);

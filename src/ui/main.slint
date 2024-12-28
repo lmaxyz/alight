@@ -11,7 +11,7 @@ export component MainWindow inherits Window {
     in-out property <[string]> available_com_ports <=> com_port_selector.model;
     
     in-out property <int> selected_monitor <=> monitor-selector.selected_monitor;
-    in property <[MonitorData]> monitors_data <=> monitor_selector.monitors_data;
+    in-out property <[MonitorData]> monitors_data <=> monitor_selector.monitors_data;
 
     in-out property <bool> is_capture_running: false;
 
@@ -19,6 +19,7 @@ export component MainWindow inherits Window {
     background: @linear-gradient(30deg, rgb(150, 240, 170) 0, rgb(250, 150, 170) 50%, rgb(150, 150, 240) 100%);
 
     VerticalBox {
+        alignment: start;
 
         HorizontalBox {
             alignment: LayoutAlignment.space-between;
@@ -65,22 +66,14 @@ export component MainWindow inherits Window {
             }
         }
         
-        VerticalBox {
-            alignment: LayoutAlignment.start;
-
-            Text {
-                text: "Monitors";
-                font-size: 18px;
-                font-weight: 600;
-                color: white;
-            }
+        HorizontalBox {
+            alignment: start;
 
             monitor_selector := MonitorSelector {
-                enabled: is_capture_running ? false : true;
+                enabled: !is_capture_running;
                 alignment: LayoutAlignment.start;
             }
         }
         
     }
-    
 }

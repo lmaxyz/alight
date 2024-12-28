@@ -1,7 +1,7 @@
 use ring_channel::RingSender;
 use tracing::debug;
 use windows_capture::{
-    capture::GraphicsCaptureApiHandler,
+    capture::{Context, GraphicsCaptureApiHandler},
     frame::Frame,
     graphics_capture_api::InternalCaptureControl
 };
@@ -13,7 +13,6 @@ pub struct Preview {
     preview_channel: RingSender<(i32, SharedPixelBuffer<Rgba8Pixel>)>
 }
 
-
 impl GraphicsCaptureApiHandler for Preview {
     // To Get The Message From The Settings
     type Flags = (usize, RingSender<(i32, SharedPixelBuffer<Rgba8Pixel>)>);
@@ -23,9 +22,9 @@ impl GraphicsCaptureApiHandler for Preview {
 
     // Function That Will Be Called To Create The Struct The Flags Can Be Passed
     // From `WindowsCaptureSettings`
-    fn new(monitors_data: Self::Flags) -> Result<Self, Self::Error> {
-        let index = monitors_data.0 as i32;
-        let preview_channel = monitors_data.1;
+    fn new(monitors_data: Context<Self::Flags>) -> Result<Self, Self::Error> {
+        let index = monitors_data.flags.0 as i32;
+        let preview_channel = monitors_data.flags.1;
 
         Ok(Preview{
             index,
@@ -41,14 +40,13 @@ impl GraphicsCaptureApiHandler for Preview {
         let mut frame_buffer = frame.buffer().unwrap();
         let width = frame_buffer.width();
         let height = frame_buffer.height();
-        let raw_buffer = Vec::from(frame_buffer.as_raw_buffer());
 
-        let buff = slint::SharedPixelBuffer::clone_from_slice(&raw_buffer, width, height);
+        let buff = slint::SharedPixelBuffer::clone_from_slice(&frame_buffer.as_raw_buffer(), width, height);
 
         self.preview_channel.send((self.index, buff)).unwrap();
 
         #[cfg(not(debug_assertions))]
-        std::thread::sleep(std::time::Duration::from_millis(5));
+        std::thread::sleep(std::time::Duration::from_millis(15));
 
         #[cfg(debug_assertions)]
         std::thread::sleep(std::time::Duration::from_millis(25));

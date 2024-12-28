@@ -3,7 +3,7 @@ use tracing::debug;
 use serialport::SerialPort;
 use slint::Weak;
 use windows_capture::{
-    capture::GraphicsCaptureApiHandler,
+    capture::{Context, GraphicsCaptureApiHandler},
     frame::Frame,
     graphics_capture_api::InternalCaptureControl
 };
@@ -92,7 +92,8 @@ impl GraphicsCaptureApiHandler for Capture {
 
     // Function That Will Be Called To Create The Struct The Flags Can Be Passed
     // From `WindowsCaptureSettings`
-    fn new((com_port, main_window): Self::Flags) -> Result<Self, Self::Error> {
+    fn new(context: Context<Self::Flags>) -> Result<Self, Self::Error> {
+        let (com_port, main_window) = context.flags;
         let left: Vec<u8> = Vec::with_capacity((VERTICAL_LEDS_NUM*3) as usize);
         let right: Vec<u8> = Vec::with_capacity((VERTICAL_LEDS_NUM*3) as usize);
         let top: Vec<u8> = Vec::with_capacity((HORIZONTAL_LEDS_NUM*3) as usize);

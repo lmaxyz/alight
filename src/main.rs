@@ -72,7 +72,7 @@ fn start_com_ports_observer(main_window_weak: Weak<MainWindow>) {
 
 
 fn start_monitors_observer(main_window_weak: Weak<MainWindow>, tx: RingSender<(i32, SharedPixelBuffer<Rgba8Pixel>)>) {
-    let image_bytes = include_bytes!("../monitor-icon.jpg");
+    let image_bytes = include_bytes!("../assets/monitor-icon.jpg");
     let img: DynamicImage = ImageReader::new(Cursor::new(image_bytes)).with_guessed_format().unwrap().decode().unwrap();
     let pix_buff = SharedPixelBuffer::clone_from_slice(&img.to_rgba8(), img.width(), img.height());
     let tx = tx.clone();
